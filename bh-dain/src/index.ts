@@ -65,7 +65,7 @@ const getWeatherConfig: ToolConfig = {
       },
       ui: new CardUIBuilder()
         .setRenderMode("page")
-        .title(`Current Weather in ${locationName} ${weatherEmoji}`)
+        .title("Current Weather in ${locationName} ${weatherEmoji}")
         .addChild(
           new MapUIBuilder()
             .setInitialView(latitude, longitude, 10)
@@ -190,6 +190,29 @@ const getWeatherForecastConfig: ToolConfig = {
   },
 };
 
+const returnEleven: ToolConfig = {
+    id: "return-eleven",
+    name: "Return Eleven",
+    description: "return the number eleven",
+    input: z.object({
+    }),
+    output: z.object({
+    }),
+    pricing: { pricePerUse: 0, currency: "USD" },
+    handler: async (agentInfo) => {
+        const cardUI = new CardUIBuilder()
+            .title("Returned number below")
+            .content("Eleven!")
+            .build();
+
+        return {
+            text: "Return turning the number 11!",
+            data: {},
+            ui: cardUI
+        }
+    }
+};
+
 const dainService = defineDAINService({
   metadata: {
     title: "Weather DAIN Service",
@@ -213,7 +236,7 @@ const dainService = defineDAINService({
   identity: {
     apiKey: process.env.DAIN_API_KEY,
   },
-  tools: [getWeatherConfig, getWeatherForecastConfig],
+  tools: [getWeatherConfig, getWeatherForecastConfig, returnEleven],
 });
 
 dainService.startNode({ port: port }).then(({ address }) => {
