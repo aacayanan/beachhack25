@@ -15,6 +15,13 @@ import {
     LayoutUIBuilder, DainResponse,
 } from "@dainprotocol/utils";
 import * as path from "node:path";
+// ts-ignore
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = 'https://gmepwebfralzzpsmazcg.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
+
 
 const execAsync = promisify(exec);
 const port = Number(process.env.PORT) || 2022;
@@ -195,38 +202,81 @@ const getWeatherForecastConfig: ToolConfig = {
     },
 };
 
-const getTheNumberSevenConfig: ToolConfig = {
-    id: "get-the-number-seven",
-    name: "Get the number seven",
-    description: "Returns the number seven",
+// const getTheNumberSevenConfig: ToolConfig = {
+//     id: "get-the-number-seven",
+//     name: "Get the number seven",
+//     description: "Returns the number seven",
+//     input: z.object({
+//         currentNumber: z.number().describe("Current number"),
+//         crashoutStatus: z.boolean().describe("The user will say their crashout status."),
+//         supabaseItems: z.any().describe("The user will get the items from supabase")
+//     })
+//         .describe("Input parameters for the number request"),
+//     output: z.object({
+//         numberSeven: z.number()
+//     })
+//         .describe("The number seven"),
+//     pricing: {pricePerUse: 0, currency: "USD"},
+//     handler: async (
+//         {currentNumber , crashoutStatus},
+//         agentInfo
+//     ) => {
+//         const { data, error } = await supabase.from('name').select('*')
+//         if (error) {
+//             console.log(error)
+//             return
+//         }
+//         return {
+//             text: `your crashout status is ${crashoutStatus} because your number is ${currentNumber}`,
+//             data: {
+//                 numberSeven: 7,
+//                 currentlyCrashed: crashoutStatus,
+//                 supabaseItems: data
+//             },
+//             ui: new CardUIBuilder()
+//                 .setRenderMode("page")
+//                 .title("The Number Seven")
+//                 .content("The number seven is a mystical number")
+//                 .build()
+//         };
+//     }
+// }
+
+const createUserConfig: ToolConfig = {
+    id: "create-user",
+    name: "Create User",
+    description: "Create a user in the database",
     input: z.object({
-        currentNumber: z.number().describe("Current number"),
-        crashoutStatus: z.boolean().describe("The user will say their crashout status.")
+        id: z.number().describe("ID of the user"),
+        name: z.string().describe("Name of the user"),
     })
-        .describe("Input parameters for the number request"),
+        .describe("Input parameters for the user creation"),
     output: z.object({
-        numberSeven: z.number()
-    })
-        .describe("The number seven"),
-    pricing: {pricePerUse: 0, currency: "USD"},
-    handler: async (
-        {currentNumber , crashoutStatus},
-        agentInfo
-    ) => {
+        id: z.number(),
+        name: z.string()
+    }),
+    handler: async ({ id, name }) => {
+        const { data, error } = await supabase
+            .from('userdata')
+            .insert({ id, name })
+            .select()
+            .single();
+        if (error) throw error;
+        const cardUI = new CardUIBuilder()
+            .title("User Created")
+            .content(`Name ${data.name}`)
+            .build()
         return {
-            text: `your crashout status is ${crashoutStatus} because your number is ${currentNumber}`,
+            text: `User created: ${data.name}`,
             data: {
-                numberSeven: 7,
-                currentlyCrashed: crashoutStatus
+                id: data.id,
+                name: data.name
             },
-            ui: new CardUIBuilder()
-                .setRenderMode("page")
-                .title("The Number Seven")
-                .content("The number seven is a mystical number")
-                .build()
-        };
+            ui: cardUI
+        }
     }
 }
+
 
 const dainService = defineDAINService({
     metadata: {
@@ -251,7 +301,7 @@ const dainService = defineDAINService({
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [getWeatherConfig, getWeatherForecastConfig, getTheNumberSevenConfig],
+    tools: [getWeatherConfig, getWeatherForecastConfig, createUserConfig],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
