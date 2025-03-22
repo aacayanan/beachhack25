@@ -6,10 +6,10 @@ import axios from "axios";
 import { defineDAINService, ToolConfig } from "@dainprotocol/service-sdk";
 
 import {
-  CardUIBuilder,
-  TableUIBuilder,
-  MapUIBuilder,
-  LayoutUIBuilder,
+    CardUIBuilder,
+    TableUIBuilder,
+    MapUIBuilder,
+    LayoutUIBuilder, DainResponse,
 } from "@dainprotocol/utils";
 
 const port = Number(process.env.PORT) || 2022;
@@ -190,6 +190,37 @@ const getWeatherForecastConfig: ToolConfig = {
   },
 };
 
+const getTheNumberSevenConfig: ToolConfig = {
+    id: "get-the-number-seven",
+    name: "Get the number seven",
+    description: "Returns the number seven",
+    input: z.object({
+        currentNumber: z.number().describe("Current number")
+    })
+        .describe("Input parameters for the number request"),
+    output: z.object({
+        numberSeven: z.number()
+    })
+        .describe("The number seven"),
+    pricing: { pricePerUse: 0, currency: "USD" },
+    handler: async (
+        { currentNumber },
+        agentInfo
+    ) => {
+        return {
+            text: "The number seven is a mystical number",
+            data: {
+                numberSeven: 7
+            },
+            ui: new CardUIBuilder()
+                .setRenderMode("page")
+                .title("The Number Seven")
+                .content("The number seven is a mystical number")
+                .build()
+        };
+    }
+}
+
 const dainService = defineDAINService({
   metadata: {
     title: "Weather DAIN Service",
@@ -213,7 +244,7 @@ const dainService = defineDAINService({
   identity: {
     apiKey: process.env.DAIN_API_KEY,
   },
-  tools: [getWeatherConfig, getWeatherForecastConfig],
+  tools: [getWeatherConfig, getWeatherForecastConfig, getTheNumberSevenConfig],
 });
 
 dainService.startNode({ port: port }).then(({ address }) => {
