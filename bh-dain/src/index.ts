@@ -1,6 +1,7 @@
 //File: example/example-node.ts
 
 import {z} from "zod";
+// import { zodToJsonSchema } from "@zod/json-schema";
 import {defineDAINService, ToolConfig} from "@dainprotocol/service-sdk";
 import {
     CardUIBuilder,
@@ -21,15 +22,16 @@ const createEmployeeConfig: ToolConfig = {
     name: "Create Employee",
     description: "Create a user in the employee schedule",
     input: z.object({
-        id: z.number().describe("ID of the employee"),
+        id: z.number().optional().describe("ID of the employee"),
         name: z.string().describe("Name of the employee"),
-    })
-        .describe("Input parameters for the employee creation"),
+        availability: z.string().optional().describe("Availability of the employee")
+    }).describe("Input parameters for the employee creation"),
     output: z.object({
         id: z.number(),
-        name: z.string()
+        name: z.string(),
+        availability: z.string()
     }),
-    handler: async ({ id, name }) => {
+    handler: async ({ id, name, availability }) => {
         const { data, error } = await supabase
             .from('userdata')
             .insert({ id, name })
@@ -40,11 +42,13 @@ const createEmployeeConfig: ToolConfig = {
             .title("User Created")
             .content(`Name ${data.name}`)
             .build()
+        console.log(availability)
         return {
             text: `User created: ${data.name}`,
             data: {
                 id: data.id,
-                name: data.name
+                name: data.name,
+                availability: availability
             },
             ui: cardUI
         }
