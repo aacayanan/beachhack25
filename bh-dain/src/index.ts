@@ -1,264 +1,50 @@
 //File: example/example-node.ts
 
 import {z} from "zod";
-import axios from "axios";
-import * as fs from "fs";
-
+// import { zodToJsonSchema } from "@zod/json-schema";
 import {defineDAINService, ToolConfig} from "@dainprotocol/service-sdk";
-
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import {
+    ChartUIBuilder,
     CardUIBuilder,
     TableUIBuilder,
-    MapUIBuilder,
     LayoutUIBuilder, DainResponse,
 } from "@dainprotocol/utils";
-import * as path from "node:path";
-// ts-ignore
 import { createClient } from '@supabase/supabase-js'
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const supabaseUrl = 'https://gmepwebfralzzpsmazcg.supabase.co'
 const supabaseKey = process.env.SUPABASE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-
-const execAsync = promisify(exec);
 const port = Number(process.env.PORT) || 2022;
 
-const getWeatherEmoji = (temperature: number): string => {
-    if (temperature <= 0) return "🥶";
-    if (temperature <= 10) return "❄️";
-    if (temperature <= 20) return "⛅";
-    if (temperature <= 25) return "☀️";
-    if (temperature <= 30) return "🌞";
-    return "🔥";
-};
-
-const getWeatherConfig: ToolConfig = {
-    id: "get-weather",
-    name: "Get Weather",
-    description: "Fetches current weather for a city",
-    input: z
-        .object({
-            locationName: z.string().describe("Location name"),
-            latitude: z.number().describe("Latitude coordinate"),
-            longitude: z.number().describe("Longitude coordinate"),
-        })
-        .describe("Input parameters for the weather request"),
-    output: z
-        .object({
-            temperature: z.number().describe("Current temperature in Celsius"),
-            windSpeed: z.number().describe("Current wind speed in km/h"),
-        })
-        .describe("Current weather information"),
-    pricing: {pricePerUse: 0, currency: "USD"},
-    handler: async (
-        {locationName, latitude, longitude},
-        agentInfo,
-        context
-    ) => {
-        console.log(
-            `User / Agent ${agentInfo.id} requested weather at ${locationName} (${latitude},${longitude})`
-        );
-
-        const response = await axios.get(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m`
-        );
-
-        const {temperature_2m, wind_speed_10m} = response.data.current;
-        const weatherEmoji = getWeatherEmoji(temperature_2m);
-
-        return {
-            text: `The current temperature in ${locationName} is ${temperature_2m}°C with wind speed of ${wind_speed_10m} km/h`,
-            data: {
-                temperature: temperature_2m,
-                windSpeed: wind_speed_10m,
-            },
-            ui: new CardUIBuilder()
-                .setRenderMode("page")
-                .title(`Current Weather in ${locationName} ${weatherEmoji}`)
-                .addChild(
-                    new MapUIBuilder()
-                        .setInitialView(latitude, longitude, 10)
-                        .setMapStyle("mapbox://styles/mapbox/streets-v12")
-                        .addMarkers([
-                            {
-                                latitude,
-                                longitude,
-                                title: locationName,
-                                description: `Temperature: ${temperature_2m}°C\nWind: ${wind_speed_10m} km/h`,
-                                text: `${locationName} ${weatherEmoji}`,
-                            },
-                        ])
-                        .build()
-                )
-                .content(
-                    `Temperature: ${temperature_2m}°C\nWind Speed: ${wind_speed_10m} km/h`
-                )
-                .build(),
-        };
-    },
-};
-
-const getWeatherForecastConfig: ToolConfig = {
-    id: "get-weather-forecast",
-    name: "Get Weather Forecast",
-    description: "Fetches hourly weather forecast",
-    input: z
-        .object({
-            locationName: z.string().describe("Location name"),
-            latitude: z.number().describe("Latitude coordinate"),
-            longitude: z.number().describe("Longitude coordinate"),
-        })
-        .describe("Input parameters for the forecast request"),
-    output: z
-        .object({
-            times: z.array(z.string()).describe("Forecast times"),
-            temperatures: z
-                .array(z.number())
-                .describe("Temperature forecasts in Celsius"),
-            windSpeeds: z.array(z.number()).describe("Wind speed forecasts in km/h"),
-            humidity: z
-                .array(z.number())
-                .describe("Relative humidity forecasts in %"),
-        })
-        .describe("Hourly weather forecast"),
-    pricing: {pricePerUse: 0, currency: "USD"},
-    handler: async (
-        {locationName, latitude, longitude},
-        agentInfo,
-        context
-    ) => {
-        console.log(
-            `User / Agent ${agentInfo.id} requested forecast at ${locationName} (${latitude},${longitude})`
-        );
-
-        const response = await axios.get(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m`
-        );
-
-        const {time, temperature_2m, wind_speed_10m, relative_humidity_2m} =
-            response.data.hourly;
-
-        // Limit to first 24 hours of forecast data
-        const limitedTime = time.slice(0, 24);
-        const limitedTemp = temperature_2m.slice(0, 24);
-        const limitedWind = wind_speed_10m.slice(0, 24);
-        const limitedHumidity = relative_humidity_2m.slice(0, 24);
-
-        const weatherEmoji = getWeatherEmoji(limitedTemp[0]);
-
-        return {
-            text: `Weather forecast for ${locationName} available for the next 24 hours`,
-            data: {
-                times: limitedTime,
-                temperatures: limitedTemp,
-                windSpeeds: limitedWind,
-                humidity: limitedHumidity,
-            },
-            ui: new LayoutUIBuilder()
-                .setRenderMode("page")
-                .setLayoutType("column")
-                .addChild(
-                    new MapUIBuilder()
-                        .setInitialView(latitude, longitude, 10)
-                        .setMapStyle("mapbox://styles/mapbox/streets-v12")
-                        .addMarkers([
-                            {
-                                latitude,
-                                longitude,
-                                title: locationName,
-                                description: `Temperature: ${limitedTemp[0]}°C\nWind: ${limitedWind[0]} km/h`,
-                                text: `${locationName} ${weatherEmoji}`,
-                            },
-                        ])
-                        .build()
-                )
-                .addChild(
-                    new TableUIBuilder()
-                        .addColumns([
-                            {key: "time", header: "Time", type: "string"},
-                            {
-                                key: "temperature",
-                                header: "Temperature (°C)",
-                                type: "number",
-                            },
-                            {key: "windSpeed", header: "Wind Speed (km/h)", type: "number"},
-                            {key: "humidity", header: "Humidity (%)", type: "number"},
-                        ])
-                        .rows(
-                            limitedTime.map((t: string, i: number) => ({
-                                time: new Date(t).toLocaleString(),
-                                temperature: limitedTemp[i],
-                                windSpeed: limitedWind[i],
-                                humidity: limitedHumidity[i],
-                            }))
-                        )
-                        .build()
-                )
-                .build(),
-        };
-    },
-};
-
-// const getTheNumberSevenConfig: ToolConfig = {
-//     id: "get-the-number-seven",
-//     name: "Get the number seven",
-//     description: "Returns the number seven",
-//     input: z.object({
-//         currentNumber: z.number().describe("Current number"),
-//         crashoutStatus: z.boolean().describe("The user will say their crashout status."),
-//         supabaseItems: z.any().describe("The user will get the items from supabase")
-//     })
-//         .describe("Input parameters for the number request"),
-//     output: z.object({
-//         numberSeven: z.number()
-//     })
-//         .describe("The number seven"),
-//     pricing: {pricePerUse: 0, currency: "USD"},
-//     handler: async (
-//         {currentNumber , crashoutStatus},
-//         agentInfo
-//     ) => {
-//         const { data, error } = await supabase.from('name').select('*')
-//         if (error) {
-//             console.log(error)
-//             return
-//         }
-//         return {
-//             text: `your crashout status is ${crashoutStatus} because your number is ${currentNumber}`,
-//             data: {
-//                 numberSeven: 7,
-//                 currentlyCrashed: crashoutStatus,
-//                 supabaseItems: data
-//             },
-//             ui: new CardUIBuilder()
-//                 .setRenderMode("page")
-//                 .title("The Number Seven")
-//                 .content("The number seven is a mystical number")
-//                 .build()
-//         };
-//     }
-// }
-
-const createUserConfig: ToolConfig = {
-    id: "create-user",
-    name: "Create User",
-    description: "Create a user in the database",
+const createEmployeeConfig: ToolConfig = {
+    id: "create-employee",
+    name: "Create Employee",
+    description: "Create a user in the employee schedule",
     input: z.object({
-        id: z.number().describe("ID of the user"),
-        name: z.string().describe("Name of the user"),
-    })
-        .describe("Input parameters for the user creation"),
+        id: z.number().optional().describe("ID of the employee"),
+        name: z.string().describe("Name of the employee"),
+        availability: z.string().optional().describe("Availability of the employee")
+    }).describe("Input parameters for the employee creation"),
     output: z.object({
         id: z.number(),
-        name: z.string()
+        name: z.string(),
+        availability: z.string()
     }),
-    handler: async ({ id, name }) => {
+    handler: async ({ id, name, availability }) => {
+        // gemini api call
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
+        const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
+        with Sunday 0-index, and its values be a list of floats from a 24 hour clock. "${availability}"`;
+        const result = await model.generateContent(prompt);
+        const rawText = result.response.text();
+        availability = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        // supabase api call
         const { data, error } = await supabase
             .from('userdata')
-            .insert({ id, name })
+            .insert({ id, name, availability })
             .select()
             .single();
         if (error) throw error;
@@ -270,38 +56,189 @@ const createUserConfig: ToolConfig = {
             text: `User created: ${data.name}`,
             data: {
                 id: data.id,
-                name: data.name
+                name: data.name,
+                availability: data.availability
             },
             ui: cardUI
         }
     }
 }
 
+const removeEmployeeConfig: ToolConfig = {
+    id: "remove-employee",
+    name: "Remove Employee",
+    description: "Remove a user from the schedule",
+    input: z.object({
+        name: z.string().describe("Name of the employee"),
+        id: z.number().optional().describe("ID of the employee"),
+    }).describe("Input parameters for the employee removal"),
+    output: z.object({
+        id: z.number(),
+        name: z.string()
+    }),
+    handler: async ({ name, id }) => {
+        const { data, error } = await supabase
+            .from('userdata')
+            .delete()
+            .eq('name', name);
+        if (error) throw error;
+        const cardUI = new CardUIBuilder()
+            .title("User Removed")
+            .content(`Name ${name}`)
+            .build()
+        return {
+            text: 'Employee successfully removed. Show user a success screen',
+            data: {
+                id: 0,
+                name: "removed"
+            },
+            ui: cardUI
+        }
+    }
+}
+
+const updateEmployeeConfig: ToolConfig = {
+    id: "update-employee",
+    name: "Update Employee",
+    description: "Update a user in the schedule",
+    input: z.object({
+        id: z.number().optional().describe("ID of the employee"),
+        name: z.string().optional().describe("Name of the employee"),
+        updater: z.string().describe("What parameter is being updated?")
+    }).describe("Input parameters for the employee update"),
+    output: z.object({
+        id: z.number(),
+        name: z.string()
+    }),
+    handler: async ({ id, name, updater }) => {
+        if (updater == 'id') {
+            // update id
+            const { data, error } = await supabase
+                .from('userdata')
+                .update({ id })
+                .eq('name', name);
+        }
+        if (updater == 'name') {
+            // update name
+            const { data, error } = await supabase
+                .from('userdata')
+                .update({ name })
+                .eq('id', id);
+        }
+        const cardUI = new CardUIBuilder()
+            .title("User Updated")
+            .content(`Name ${name}`)
+            .build()
+        return {
+            text: 'Employee successfully updated. Show user a success screen',
+            data: {
+                id: id,
+                name: name
+            },
+            ui: cardUI
+        }
+    }
+}
+
+const viewEmployeeConfig: ToolConfig = {
+    id: "view-employee-userbase",
+    name: "View Employees",
+    description: "View all employees in the roster. Show a table of the availability of each employee.",
+    input: z.object({}),
+    output: z.object({
+        database: z.any()
+    }),
+    handler: async ({}) => {
+        const { data, error } = await supabase
+            .from('userdata')
+            .select()
+        if (error) throw error;
+        const tableUI = new TableUIBuilder()
+            .setRenderMode('page')
+            .addColumns([
+                { key: "id", header: "ID", type: "number" },
+                { key: "name", header: "Name", type: "text" },
+                // { key: "availability", header: "Availability", type: "text" }
+            ])
+            .rows(data.map(data => ({
+                id: data.id,
+                name: data.name,
+                availability: data.availability
+            })))
+            .build();
+        return {
+            text: 'Employee roster displayed',
+            data: {
+                database: data
+            },
+            ui: tableUI
+        }
+    }
+}
+
+const displayGraphAvailability : ToolConfig = {
+    id: "display-graph-availability",
+    name: "Display Graph Availability",
+    description: "Display a graph of everyone's availability",
+    input: z.object({
+
+    }),
+    output: z.object({
+
+    }),
+    handler: async ({}) => {
+        return {
+            text: 'All employee availability displayed in bar graph.',
+            data: {
+
+            },
+            ui: new ChartUIBuilder()
+                .type('bar')
+                .title('Employee Availability')
+                .setRenderMode('page')
+                .chartData([
+                    //will connect to supabase when json converting method is merged
+                    {hour: "00:00", employees: 1},
+                    {hour: "01:00", employees: 1},
+                    {hour: "02:00", employees: 2},
+                    {hour: "03:00", employees: 2},
+                    {hour: "04:00", employees: 3}
+                    ]
+                )
+                .dataKeys({
+                    x: "hour",
+                    y: "employees"
+                })
+                .description("Employee availability displayed for 3/22")
+                .build()
+        }
+    }
+}
 
 const dainService = defineDAINService({
     metadata: {
-        title: "Weather DAIN Service",
+        title: "Onboard Scheduler DAIN Service",
         description:
-            "A DAIN service for current weather and forecasts using Open-Meteo API",
+            "A DAIN service for onboarding employees and managing their schedules.",
         version: "1.0.0",
-        author: "Your Name",
-        tags: ["weather", "forecast", "dain"],
-        logo: "https://cdn-icons-png.flaticon.com/512/252/252035.png",
+        author: "Aaron C. and Dylan L. for BeachHacks 2025",
+        tags: ["schedule", "onboarding", "employees", "management", "HR"],
+        logo: "https://icons.veryicon.com/png/o/miscellaneous/unicons/schedule-19.png",
     },
     exampleQueries: [
         {
-            category: "Weather",
+            category: "Management",
             queries: [
-                "What is the weather in Tokyo?",
-                "What is the weather in San Francisco?",
-                "What is the weather in London?",
+                "Good morning!",
+                "Add a new employee.",
+                "Remove an employee."
             ],
         },
     ],
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [getWeatherConfig, getWeatherForecastConfig, createUserConfig],
+    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig, viewEmployeeConfig, displayGraphAvailability],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
