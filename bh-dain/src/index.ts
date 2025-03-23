@@ -34,13 +34,18 @@ const createEmployeeConfig: ToolConfig = {
     }),
     handler: async ({ id, name, availability }) => {
         // gemini api call
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
-        const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
-        with Sunday 0-index, and its values be a list of floats from a 24 hour clock. "${availability}"`;
-        const result = await model.generateContent(prompt);
-        const rawText = result.response.text();
-        availability = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        if (availability != undefined) {
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
+            const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
+        with Sunday 0-index, and its values be a list of floats from a 24 hour clock as [start, end]. Include the empty days 
+        and do not include code or code blocking. "${availability}"`;
+            const result = await model.generateContent(prompt);
+            const rawText = result.response.text();
+            availability = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else {
+            availability = "None";
+        }
         // supabase api call
         const { data, error } = await supabase
             .from('userdata')
@@ -104,13 +109,24 @@ const updateEmployeeConfig: ToolConfig = {
     input: z.object({
         id: z.number().optional().describe("ID of the employee"),
         name: z.string().optional().describe("Name of the employee"),
+        availability: z.string().optional().describe("Availability of the employee"),
         updater: z.string().describe("What parameter is being updated?")
     }).describe("Input parameters for the employee update"),
     output: z.object({
-        id: z.number(),
-        name: z.string()
+        success: z.boolean()
     }),
-    handler: async ({ id, name, updater }) => {
+    handler: async ({ id, name, availability, updater }) => {
+        // gemini api call
+        if (updater == 'availability') {
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
+            const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
+        with Sunday 0-index, and its values be a list of floats from a 24 hour clock as [start, end]. Include the empty days 
+        and do not include code or code blocking. "${availability}"`;
+            const result = await model.generateContent(prompt);
+            const rawText = result.response.text();
+            availability = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        }
         if (updater == 'id') {
             // update id
             const { data, error } = await supabase
@@ -125,6 +141,13 @@ const updateEmployeeConfig: ToolConfig = {
                 .update({ name })
                 .eq('id', id);
         }
+        if (updater == 'availability') {
+            // update availability
+            const { data, error } = await supabase
+                .from('userdata')
+                .update({ availability })
+                .eq('name', name);
+        }
         const cardUI = new CardUIBuilder()
             .title("User Updated")
             .content(`Name ${name}`)
@@ -132,8 +155,7 @@ const updateEmployeeConfig: ToolConfig = {
         return {
             text: 'Employee successfully updated. Show user a success screen',
             data: {
-                id: id,
-                name: name
+                success: true // assume true for testing
             },
             ui: cardUI
         }
