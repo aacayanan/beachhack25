@@ -84,6 +84,49 @@ const removeEmployeeConfig: ToolConfig = {
     }
 }
 
+const updateEmployeeConfig: ToolConfig = {
+    id: "update-employee",
+    name: "Update Employee",
+    description: "Update a user in the schedule",
+    input: z.object({
+        id: z.number().optional().describe("ID of the employee"),
+        name: z.string().optional().describe("Name of the employee"),
+        updater: z.string().describe("What parameter is being updated?")
+    }).describe("Input parameters for the employee update"),
+    output: z.object({
+        id: z.number(),
+        name: z.string()
+    }),
+    handler: async ({ id, name, updater }) => {
+        if (updater == 'id') {
+            // update id
+            const { data, error } = await supabase
+                .from('userdata')
+                .update({ id })
+                .eq('name', name);
+        }
+        if (updater == 'name') {
+            // update name
+            const { data, error } = await supabase
+                .from('userdata')
+                .update({ name })
+                .eq('id', id);
+        }
+        const cardUI = new CardUIBuilder()
+            .title("User Updated")
+            .content(`Name ${name}`)
+            .build()
+        return {
+            text: 'Employee successfully updated. Show user a success screen',
+            data: {
+                id: id,
+                name: name
+            },
+            ui: cardUI
+        }
+    }
+}
+
 const dainService = defineDAINService({
     metadata: {
         title: "Onboard Scheduler DAIN Service",
@@ -96,18 +139,18 @@ const dainService = defineDAINService({
     },
     exampleQueries: [
         {
-            category: "Weather",
+            category: "Management",
             queries: [
-                "What is the weather in Tokyo?",
-                "What is the weather in San Francisco?",
-                "What is the weather in London?",
+                "Good morning!",
+                "Add a new employee.",
+                "Remove an employee."
             ],
         },
     ],
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [createEmployeeConfig, removeEmployeeConfig],
+    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
