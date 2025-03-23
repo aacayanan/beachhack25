@@ -7,10 +7,10 @@ import {
     ChartUIBuilder,
     CardUIBuilder,
     TableUIBuilder,
-    LayoutUIBuilder, DainResponse,
+    LayoutUIBuilder, DainResponse, FormUIBuilder,
 } from "@dainprotocol/utils";
-import { createClient } from '@supabase/supabase-js'
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import {createClient} from '@supabase/supabase-js'
+import {GoogleGenerativeAI} from "@google/generative-ai";
 
 const supabaseUrl = 'https://gmepwebfralzzpsmazcg.supabase.co'
 const supabaseKey = process.env.SUPABASE_KEY
@@ -32,11 +32,11 @@ const createEmployeeConfig: ToolConfig = {
         name: z.string(),
         availability: z.string()
     }),
-    handler: async ({ id, name, availability }) => {
+    handler: async ({id, name, availability}) => {
         // gemini api call
         if (availability != undefined) {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
+            const model = genAI.getGenerativeModel({model: "gemini-2.0-flash"});
             const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
         with Sunday 0-index, and its values be a list of floats from a 24 hour clock as [start, end]. Include the empty days 
         and do not include code or code blocking. "${availability}"`;
@@ -47,9 +47,9 @@ const createEmployeeConfig: ToolConfig = {
             availability = "None";
         }
         // supabase api call
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('userdata')
-            .insert({ id, name, availability })
+            .insert({id, name, availability})
             .select()
             .single();
         if (error) throw error;
@@ -81,8 +81,8 @@ const removeEmployeeConfig: ToolConfig = {
         id: z.number(),
         name: z.string()
     }),
-    handler: async ({ name, id }) => {
-        const { data, error } = await supabase
+    handler: async ({name, id}) => {
+        const {data, error} = await supabase
             .from('userdata')
             .delete()
             .eq('name', name);
@@ -115,11 +115,11 @@ const updateEmployeeConfig: ToolConfig = {
     output: z.object({
         success: z.boolean()
     }),
-    handler: async ({ id, name, availability, updater }) => {
+    handler: async ({id, name, availability, updater}) => {
         // gemini api call
         if (updater == 'availability') {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
+            const model = genAI.getGenerativeModel({model: "gemini-2.0-flash"});
             const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
         with Sunday 0-index, and its values be a list of floats from a 24 hour clock as [start, end]. Include the empty days 
         and do not include code or code blocking. "${availability}"`;
@@ -129,23 +129,23 @@ const updateEmployeeConfig: ToolConfig = {
         }
         if (updater == 'id') {
             // update id
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('userdata')
-                .update({ id })
+                .update({id})
                 .eq('name', name);
         }
         if (updater == 'name') {
             // update name
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('userdata')
-                .update({ name })
+                .update({name})
                 .eq('id', id);
         }
         if (updater == 'availability') {
             // update availability
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('userdata')
-                .update({ availability })
+                .update({availability})
                 .eq('name', name);
         }
         const cardUI = new CardUIBuilder()
@@ -171,16 +171,15 @@ const viewEmployeeConfig: ToolConfig = {
         database: z.any()
     }),
     handler: async ({}) => {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('userdata')
             .select()
         if (error) throw error;
         const tableUI = new TableUIBuilder()
-            .setRenderMode('page')
             .addColumns([
-                { key: "id", header: "ID", type: "number" },
-                { key: "name", header: "Name", type: "text" },
-                // { key: "availability", header: "Availability", type: "text" }
+                {key: "id", header: "ID", type: "number"},
+                {key: "name", header: "Name", type: "text"},
+                {key: "availability", header: "Availability", type: "text"}
             ])
             .rows(data.map(data => ({
                 id: data.id,
@@ -198,33 +197,114 @@ const viewEmployeeConfig: ToolConfig = {
     }
 }
 
-const displayGraphAvailability : ToolConfig = {
+const createNewSchedule: ToolConfig = {
+    id: "create-new-schedule",
+    name: "Create New Schedule",
+    description: "Create a new schedule for the employees.",
+    input: z.object({
+        day: z.string().describe("Day of the week")
+    }),
+    output: z.object({
+        database: z.any()
+    }),
+    handler: async ({}) => {
+        // get the database
+        const {data, error} = await supabase
+            .from('userdata')
+            .select()
+        if (error) throw error;
+        // form ui
+        const formUI = new FormUIBuilder()
+            .title("Create New Schedule")
+            .description("Create a new schedule for the employees.")
+            .setRenderMode('page')
+            .addFields([
+                {
+                    name: "start",
+                    label: "Start Time",
+                    type: "string",
+                    widget: "text",
+                    required: true
+                },
+                {
+                    name: "end",
+                    label: "End Time",
+                    type: "string",
+                    widget: "text",
+                    required: true
+                }
+            ])
+            .onSubmit({
+                tool: "display-graph-availability"
+            })
+            .build();
+        return {
+            text: 'Do not output anything. Wait for the form submission, then generate a schedule.',
+            data: {},
+            ui: formUI
+        }
+    }
+}
+
+const generateSchedule: ToolConfig = {
+    id: "generate-schedule",
+    name: "Generate Schedule",
+    description: "Generate a schedule for the employees.",
+    input: z.object({
+        start: z.string().describe("Start time"),
+        end: z.string().describe("End time")
+    }),
+    output: z.object({
+        schedule: z.any()
+    }),
+    handler: async ({}) => {
+        // get the database
+        const {data, error} = await supabase
+            .from('userdata')
+            .select()
+        if (error) throw error;
+        // const tableUI = new TableUIBuilder()
+        //     .addColumns([
+        //         {key: "name", header: "Name", type: "text"},
+        //         {key: "availability", header: "Availability", type: "text"}
+        //     ])
+        //     .rows(schedule)
+        //     .build();
+        const cardUI = new CardUIBuilder()
+            .title("Schedule Generated")
+            .content(`Schedule generated for FIXME employees`)
+            .build
+        return {
+            text: 'Generate schedule for the employees based on the availability.',
+            data: {
+                schedule: data
+            },
+            ui: cardUI
+        }
+    }
+}
+
+const displayGraphAvailability: ToolConfig = {
     id: "display-graph-availability",
     name: "Display Graph Availability",
     description: "Display a graph of everyone's availability",
-    input: z.object({
-
-    }),
-    output: z.object({
-
-    }),
+    input: z.object({}),
+    output: z.object({}),
     handler: async ({}) => {
         return {
-            text: 'All employee availability displayed in bar graph.',
-            data: {
-
-            },
+            text: 'Now generate-schedule using the day and availabilities.',
+            data: {},
             ui: new ChartUIBuilder()
                 .type('bar')
                 .title('Employee Availability')
                 .setRenderMode('page')
                 .chartData([
-                    //will connect to supabase when json converting method is merged
-                    {hour: "00:00", employees: 1},
-                    {hour: "01:00", employees: 1},
-                    {hour: "02:00", employees: 2},
-                    {hour: "03:00", employees: 2},
-                    {hour: "04:00", employees: 3}
+                        //will connect to supabase when json converting method is merged
+                        {hour: "00:00", employees: 1},
+                        {hour: "01:00", employees: 1},
+                        {hour: "02:00", employees: 2},
+                        {hour: "03:00", employees: 2},
+                        {hour: "04:00", employees: 3}
                     ]
                 )
                 .dataKeys({
@@ -260,7 +340,7 @@ const dainService = defineDAINService({
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig, viewEmployeeConfig, displayGraphAvailability],
+    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig, viewEmployeeConfig, displayGraphAvailability, createNewSchedule, generateSchedule],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
