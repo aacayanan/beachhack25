@@ -131,6 +131,42 @@ const updateEmployeeConfig: ToolConfig = {
     }
 }
 
+const viewEmployeeConfig: ToolConfig = {
+    id: "view-employee-userbase",
+    name: "View Employees",
+    description: "View all employees in the roster. Show a table of the availability of each employee.",
+    input: z.object({}),
+    output: z.object({
+        database: z.any()
+    }),
+    handler: async ({}) => {
+        const { data, error } = await supabase
+            .from('userdata')
+            .select()
+        if (error) throw error;
+        const tableUI = new TableUIBuilder()
+            .setRenderMode('page')
+            .addColumns([
+                { key: "id", header: "ID", type: "number" },
+                { key: "name", header: "Name", type: "text" },
+                // { key: "availability", header: "Availability", type: "text" }
+            ])
+            .rows(data.map(data => ({
+                id: data.id,
+                name: data.name,
+                availability: data.availability
+            })))
+            .build();
+        return {
+            text: 'Employee roster displayed',
+            data: {
+                database: data
+            },
+            ui: tableUI
+        }
+    }
+}
+
 const dainService = defineDAINService({
     metadata: {
         title: "Onboard Scheduler DAIN Service",
@@ -154,7 +190,7 @@ const dainService = defineDAINService({
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig],
+    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig, viewEmployeeConfig],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
