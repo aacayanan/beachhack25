@@ -57,7 +57,7 @@ const createEmployeeConfig: ToolConfig = {
         if (error) throw error;
         const cardUI = new CardUIBuilder()
             .title("User Created")
-            .content(`Name ${data.name}`)
+            .content(`${data.name}`)
             .build()
         return {
             text: `User created: ${data.name}`,
@@ -303,6 +303,7 @@ const displayGraphAvailability: ToolConfig = {
     input: z.object({}),
     output: z.object({}),
     handler: async ({}) => {
+
         return {
             text: 'Now generate-schedule using the day and availabilities.',
             data: {},
@@ -314,9 +315,29 @@ const displayGraphAvailability: ToolConfig = {
                         //will connect to supabase when json converting method is merged
                         {hour: "00:00", employees: 1},
                         {hour: "01:00", employees: 1},
-                        {hour: "02:00", employees: 2},
-                        {hour: "03:00", employees: 2},
-                        {hour: "04:00", employees: 3}
+                        {hour: "02:00", employees: 1},
+                        {hour: "03:00", employees: 1},
+                        {hour: "04:00", employees: 2},
+                        {hour: "05:00", employees: 2},
+                        {hour: "06:00", employees: 2},
+                        {hour: "07:00", employees: 3},
+                        {hour: "08:00", employees: 3},
+                        {hour: "09:00", employees: 4},
+                        {hour: "10:00", employees: 4},
+                        {hour: "11:00", employees: 5},
+                        {hour: "12:00", employees: 4},
+                        {hour: "13:00", employees: 4},
+                        {hour: "14:00", employees: 3},
+                        {hour: "15:00", employees: 3},
+                        {hour: "16:00", employees: 2},
+                        {hour: "17:00", employees: 1},
+                        {hour: "18:00", employees: 1},
+                        {hour: "19:00", employees: 1},
+                        {hour: "20:00", employees: 1},
+                        {hour: "21:00", employees: 1},
+                        {hour: "22:00", employees: 1},
+                        {hour: "23:00", employees: 1},
+                        {hour: "24:00", employees: 1}
                     ]
                 )
                 .dataKeys({
