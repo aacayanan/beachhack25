@@ -4,9 +4,9 @@ import {z} from "zod";
 // import { zodToJsonSchema } from "@zod/json-schema";
 import {defineDAINService, ToolConfig} from "@dainprotocol/service-sdk";
 import {
+    ChartUIBuilder,
     CardUIBuilder,
     TableUIBuilder,
-    MapUIBuilder,
     LayoutUIBuilder, DainResponse,
 } from "@dainprotocol/utils";
 import { createClient } from '@supabase/supabase-js'
@@ -176,6 +176,45 @@ const viewEmployeeConfig: ToolConfig = {
     }
 }
 
+const displayGraphAvailability : ToolConfig = {
+    id: "display-graph-availability",
+    name: "Display Graph Availability",
+    description: "Display a graph of everyone's availability",
+    input: z.object({
+
+    }),
+    output: z.object({
+
+    }),
+    handler: async ({}) => {
+        return {
+            text: 'All employee availability displayed in bar graph.',
+            data: {
+
+            },
+            ui: new ChartUIBuilder()
+                .type('bar')
+                .title('Employee Availability')
+                .setRenderMode('page')
+                .chartData([
+                    //will connect to supabase when json converting method is merged
+                    {hour: "00:00", employees: 1},
+                    {hour: "01:00", employees: 1},
+                    {hour: "02:00", employees: 2},
+                    {hour: "03:00", employees: 2},
+                    {hour: "04:00", employees: 3}
+                    ]
+                )
+                .dataKeys({
+                    x: "hour",
+                    y: "employees"
+                })
+                .description("Employee availability displayed for 3/22")
+                .build()
+        }
+    }
+}
+
 const dainService = defineDAINService({
     metadata: {
         title: "Onboard Scheduler DAIN Service",
@@ -199,7 +238,7 @@ const dainService = defineDAINService({
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig, viewEmployeeConfig],
+    tools: [createEmployeeConfig, removeEmployeeConfig, updateEmployeeConfig, viewEmployeeConfig, displayGraphAvailability],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
