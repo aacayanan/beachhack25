@@ -277,6 +277,59 @@ const createUserConfig: ToolConfig = {
     }
 }
 
+const setAvailabilityConfig: ToolConfig = {
+    id: "setAvailability",
+    name: "Sets Availability",
+    description: "Change employee availability to days of the week at a certain time",
+    input: z.object({
+        nameInput: z.string().describe("employee specified"),
+        dayInput: z.string().describe("days of the week"),
+        timeInput: z.string().describe("certain time"),
+    })
+    .describe("Name, days of the week, and time from user input"),
+    output: z.object({
+
+    }),
+    handler: async ({ nameInput, dayInput, timeInput }, agentInfo) => {
+        return {
+            text: `${nameInput}'s availability changed to ${dayInput} ${timeInput}`,
+            data: {
+                name: nameInput,
+                day: dayInput,
+                time: timeInput,
+            },
+            ui: new CardUIBuilder()
+                .title(`${nameInput}'s Availability Updated`)
+                .content(`${dayInput} at ${timeInput}`)
+                .build ()
+        }
+    }
+}
+
+const getAvailabilityConfig: ToolConfig = {
+    id: "getAvailability",
+    name: "Gets Availability",
+    description: "What is employee availability ?",
+    input: z.object({
+        nameInput: z.string().describe("employee specified"),
+    })
+        .describe("Name from user input"),
+    output: z.object({
+
+    }),
+    handler: async ({ nameInput }, agentInfo) => {
+        return {
+            text: `${nameInput}'s availability is {data_value}`,
+            data: {
+                name: nameInput,
+            },
+            ui: new CardUIBuilder()
+                .title(`${nameInput}'s Availability`)
+                .content(`Availability data will go here`)
+                .build ()
+        }
+    }
+}
 
 const dainService = defineDAINService({
     metadata: {
@@ -301,7 +354,8 @@ const dainService = defineDAINService({
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [getWeatherConfig, getWeatherForecastConfig, createUserConfig],
+    tools: [getWeatherConfig, getWeatherForecastConfig, createUserConfig
+    ,setAvailabilityConfig, getAvailabilityConfig],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
