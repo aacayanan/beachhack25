@@ -16,15 +16,15 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 const port = Number(process.env.PORT) || 2022;
 
-const createUserConfig: ToolConfig = {
-    id: "create-user",
-    name: "Create User",
-    description: "Create a user in the database",
+const createEmployeeConfig: ToolConfig = {
+    id: "create-employee",
+    name: "Create Employee",
+    description: "Create a user in the employee schedule",
     input: z.object({
-        id: z.number().describe("ID of the user"),
-        name: z.string().describe("Name of the user"),
+        id: z.number().describe("ID of the employee"),
+        name: z.string().describe("Name of the employee"),
     })
-        .describe("Input parameters for the user creation"),
+        .describe("Input parameters for the employee creation"),
     output: z.object({
         id: z.number(),
         name: z.string()
@@ -51,15 +51,48 @@ const createUserConfig: ToolConfig = {
     }
 }
 
+const removeEmployeeConfig: ToolConfig = {
+    id: "remove-employee",
+    name: "Remove Employee",
+    description: "Remove a user from the schedule",
+    input: z.object({
+        name: z.string().describe("Name of the employee"),
+        id: z.number().optional().describe("ID of the employee"),
+    }).describe("Input parameters for the employee removal"),
+    output: z.object({
+        id: z.number(),
+        name: z.string()
+    }),
+    handler: async ({ name, id }) => {
+        const { data, error } = await supabase
+            .from('userdata')
+            .delete()
+            .eq('name', name);
+        if (error) throw error;
+        const cardUI = new CardUIBuilder()
+            .title("User Removed")
+            .content(`Name ${name}`)
+            .build()
+        return {
+            text: 'Employee successfully removed. Show user a success screen',
+            data: {
+                id: 0,
+                name: "removed"
+            },
+            ui: cardUI
+        }
+    }
+}
+
 const dainService = defineDAINService({
     metadata: {
-        title: "Weather DAIN Service",
+        title: "Onboard Scheduler DAIN Service",
         description:
-            "A DAIN service for current weather and forecasts using Open-Meteo API",
+            "A DAIN service for onboarding employees and managing their schedules.",
         version: "1.0.0",
-        author: "Your Name",
-        tags: ["weather", "forecast", "dain"],
-        logo: "https://cdn-icons-png.flaticon.com/512/252/252035.png",
+        author: "Aaron C. and Dylan L. for BeachHacks 2025",
+        tags: ["schedule", "onboarding", "employees", "management", "HR"],
+        logo: "https://icons.veryicon.com/png/o/miscellaneous/unicons/schedule-19.png",
     },
     exampleQueries: [
         {
@@ -74,7 +107,7 @@ const dainService = defineDAINService({
     identity: {
         apiKey: process.env.DAIN_API_KEY,
     },
-    tools: [createUserConfig],
+    tools: [createEmployeeConfig, removeEmployeeConfig],
 });
 
 dainService.startNode({port: port}).then(({address}) => {
