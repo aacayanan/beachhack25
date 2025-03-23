@@ -25,14 +25,16 @@ const createEmployeeConfig: ToolConfig = {
     input: z.object({
         id: z.number().optional().describe("ID of the employee"),
         name: z.string().describe("Name of the employee"),
-        availability: z.string().optional().describe("Availability of the employee")
+        availability: z.string().optional().describe("Availability of the employee"),
+        email: z.string().optional().describe("Email of the employee")
     }).describe("Input parameters for the employee creation"),
     output: z.object({
         id: z.number(),
         name: z.string(),
-        availability: z.string()
+        availability: z.string(),
+        email: z.string()
     }),
-    handler: async ({id, name, availability}) => {
+    handler: async ({id, name, availability, email}) => {
         // gemini api call
         if (availability != undefined) {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
@@ -49,7 +51,7 @@ const createEmployeeConfig: ToolConfig = {
         // supabase api call
         const {data, error} = await supabase
             .from('userdata')
-            .insert({id, name, availability})
+            .insert({id, name, availability, email})
             .select()
             .single();
         if (error) throw error;
@@ -62,7 +64,8 @@ const createEmployeeConfig: ToolConfig = {
             data: {
                 id: data.id,
                 name: data.name,
-                availability: data.availability
+                availability: data.availability,
+                email: data.email
             },
             ui: cardUI
         }
@@ -110,12 +113,13 @@ const updateEmployeeConfig: ToolConfig = {
         id: z.number().optional().describe("ID of the employee"),
         name: z.string().optional().describe("Name of the employee"),
         availability: z.string().optional().describe("Availability of the employee"),
+        email: z.string().optional().describe("Email of the employee"),
         updater: z.string().describe("What parameter is being updated?")
     }).describe("Input parameters for the employee update"),
     output: z.object({
         success: z.boolean()
     }),
-    handler: async ({id, name, availability, updater}) => {
+    handler: async ({id, name, availability, email, updater}) => {
         // gemini api call
         if (updater == 'availability') {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
@@ -146,6 +150,13 @@ const updateEmployeeConfig: ToolConfig = {
             const {data, error} = await supabase
                 .from('userdata')
                 .update({availability})
+                .eq('name', name);
+        }
+        if (updater == 'email') {
+            // update email
+            const {data, error} = await supabase
+                .from('userdata')
+                .update({email})
                 .eq('name', name);
         }
         const cardUI = new CardUIBuilder()
@@ -179,13 +190,14 @@ const viewEmployeeConfig: ToolConfig = {
             .addColumns([
                 {key: "id", header: "ID", type: "number"},
                 {key: "name", header: "Name", type: "text"},
-                {key: "availability", header: "Availability", type: "text"}
+                {key: "email", header: "Email", type: "text"}
             ])
             .rows(data.map(data => ({
                 id: data.id,
                 name: data.name,
-                availability: data.availability
+                email: data.email
             })))
+            .setRenderMode('page')
             .build();
         return {
             text: 'Employee roster displayed',
