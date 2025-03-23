@@ -10,6 +10,7 @@ import {
     LayoutUIBuilder, DainResponse,
 } from "@dainprotocol/utils";
 import { createClient } from '@supabase/supabase-js'
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const supabaseUrl = 'https://gmepwebfralzzpsmazcg.supabase.co'
 const supabaseKey = process.env.SUPABASE_KEY
@@ -32,9 +33,18 @@ const createEmployeeConfig: ToolConfig = {
         availability: z.string()
     }),
     handler: async ({ id, name, availability }) => {
+        // gemini api call
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash"});
+        const prompt = `Convert the following text to a stringify string that resembles json as the keys as days 
+        with Sunday 0-index, and its values be a list of floats from a 24 hour clock. "${availability}"`;
+        const result = await model.generateContent(prompt);
+        const rawText = result.response.text();
+        availability = rawText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        // supabase api call
         const { data, error } = await supabase
             .from('userdata')
-            .insert({ id, name })
+            .insert({ id, name, availability })
             .select()
             .single();
         if (error) throw error;
@@ -42,13 +52,12 @@ const createEmployeeConfig: ToolConfig = {
             .title("User Created")
             .content(`Name ${data.name}`)
             .build()
-        console.log(availability)
         return {
             text: `User created: ${data.name}`,
             data: {
                 id: data.id,
                 name: data.name,
-                availability: availability
+                availability: data.availability
             },
             ui: cardUI
         }
